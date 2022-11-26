@@ -18,6 +18,8 @@ public:
     void Clear();
     inline unsigned int gl_id() { return textureId; }
 private:
+    Texture(Texture&&) = delete;
+    Texture& operator=(Texture&&) = delete;
     unsigned int textureId;
     int w, h;
     int type;

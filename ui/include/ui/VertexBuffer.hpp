@@ -44,10 +44,18 @@ public:
     return refers;
   }
 
+  VertexBuffer();
   template <typename... Ts>
   VertexBuffer(std::span<const std::tuple<Ts...>> objs)
   : VertexBuffer(construct<Ts...>(), objs)
   {}
+  VertexBuffer(std::span<const reference> refs, size_t sizeOfElement, size_t countToReserve)
+  : count(countToReserve)
+  , stride(sizeOfElement)
+  {
+    Construct(refs);
+    glBufferData(GL_ARRAY_BUFFER, stride*countToReserve, nullptr, GL_DYNAMIC_DRAW);
+  }
   template <typename T>
   VertexBuffer(std::span<const reference> refs, std::span<const T> objs)
   : count(objs.size())
@@ -63,8 +71,20 @@ public:
     glBufferData(GL_ARRAY_BUFFER, stride*objs.size(), objs.data(), GL_DYNAMIC_DRAW);
     count = objs.size();
   }
+  template <typename T>
+  void Append(std::span<const T> objs) {
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, count * sizeof(T), objs.size() * sizeof(T), objs.data());
+    count += objs.size();
+  }
+  void Truncate() {
+    count = 0;
+  }
   ~VertexBuffer();
-  void Draw();
+  VertexBuffer(VertexBuffer&&);
+  VertexBuffer& operator=(VertexBuffer&&);
+  void Draw(size_t start = 0, size_t count = 0);
   void Construct(std::span<const reference> refs);
   unsigned int vbo, vao;
 private:

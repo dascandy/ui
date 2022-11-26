@@ -7,7 +7,7 @@ class Image : public Widget {
 public:
   Image(SubTexture texture);
   ~Image() override;
-  void Render() override;
+  void Render(float parentX, float parentY, float parentZ, std::map<Texture*, std::vector<vertex>>&) override;
 private:
   SubTexture texture;
 };

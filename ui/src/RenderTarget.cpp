@@ -1,4 +1,5 @@
 #include <ui/RenderTarget.hpp>
+#include <cstdio>
 
 static int cvx = 0, cvy = 0, cvw = 0, cvh = 0;
 
@@ -22,26 +23,26 @@ static const unsigned int buffers[] =
   GL_COLOR_ATTACHMENT15
 };
 
-RenderTarget::RenderTarget(Texture *d, Texture *t1, Texture *t2, Texture *t3, Texture *t4)
-: RenderTarget(d, t1, t2, t3)
+RenderTarget::RenderTarget(bool depth, Texture *t1, Texture *t2, Texture *t3, Texture *t4)
+: RenderTarget(depth, t1, t2, t3)
 {
   AddTarget(t4);
 }
 
-RenderTarget::RenderTarget(Texture *d, Texture *t1, Texture *t2, Texture *t3) 
-: RenderTarget(d, t1, t2)
+RenderTarget::RenderTarget(bool depth, Texture *t1, Texture *t2, Texture *t3) 
+: RenderTarget(depth, t1, t2)
 {
   AddTarget(t3);
 }
 
-RenderTarget::RenderTarget(Texture *d, Texture *t1, Texture *t2) 
-: RenderTarget(d, t1)
+RenderTarget::RenderTarget(bool depth, Texture *t1, Texture *t2) 
+: RenderTarget(depth, t1)
 {
   AddTarget(t2);
 }
 
-RenderTarget::RenderTarget(Texture *d, Texture *t1)
-: depth(d != nullptr) 
+RenderTarget::RenderTarget(bool depth, Texture *t1)
+: depth(depth)
 , width(t1->width())
 , height(t1->height())
 , vx(0)
@@ -49,13 +50,16 @@ RenderTarget::RenderTarget(Texture *d, Texture *t1)
 , vw(width)
 , vh(height)
 , fbo(0)
-, d(d)
 {
   glGenFramebuffers(1, &fbo);
   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-  if (depth)
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, d->gl_id(), 0);
+  if (depth) {
+    glGenRenderbuffers(1, &rb);
+    glBindRenderbuffer(GL_RENDERBUFFER, rb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rb);    
+  }
 
   AddTarget(t1);
 }
@@ -69,7 +73,6 @@ RenderTarget::RenderTarget(int width, int height, bool depth)
 , vw(width)
 , vh(height)
 , fbo(0)
-, d(nullptr)
 {
 }
 
@@ -90,11 +93,11 @@ void RenderTarget::Activate(BlendMode bm)
 
   if (targets.size())
   {
-    glDrawBuffers(targets.size(), buffers);
     for (size_t i = 0; i < targets.size(); i++)
     {
       glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, targets[i]->gl_id(), 0);
     }
+    glDrawBuffers(targets.size(), buffers);
   }
 
   if (cvx != vx || cvy != vy || cvw != vw || cvh != vh)
@@ -104,6 +107,33 @@ void RenderTarget::Activate(BlendMode bm)
     cvw = vw;
     cvh = vh;
     glViewport(vx, vy, vw, vh);
+  }
+
+  if (depth)
+  {
+    if (targets.size()) {
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rb);
+    }
+    glEnable(GL_DEPTH_TEST);
+  }
+  else
+  {
+    glDisable(GL_DEPTH_TEST);
+  }
+
+  switch(bm)
+  {
+  case Overwrite:
+    glDisable(GL_BLEND);
+    break;
+  case Alphablend:
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    break;
+  case Additive:
+    glBlendFunc(GL_ONE, GL_ONE);
+    glEnable(GL_BLEND);
+    break;
   }
 
   int err = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -118,40 +148,6 @@ void RenderTarget::Activate(BlendMode bm)
   case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_ARB:std::terminate(); break;
   case GL_FRAMEBUFFER_INCOMPLETE_LAYER_COUNT_ARB:std::terminate(); break;
   default: std::terminate(); break;
-  }
-
-  static bool depthTestEnabled = false;
-  if (depth && !depthTestEnabled)
-  {
-    if (d) {
-      glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, d->gl_id(), 0);
-    }
-    glEnable(GL_DEPTH_TEST);
-    depthTestEnabled = true;
-  }
-  else if (!depth && depthTestEnabled)
-  {
-    glDisable(GL_DEPTH_TEST);
-    depthTestEnabled = false;
-  }
-
-  static BlendMode currentBlendMode = (BlendMode)-1;
-  if (bm != currentBlendMode) {
-    switch(bm)
-    {
-    case Overwrite:
-      glDisable(GL_BLEND);
-      break;
-    case Alphablend:
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      glEnable(GL_BLEND);
-      break;
-    case Additive:
-      glBlendFunc(GL_ONE, GL_ONE);
-      glEnable(GL_BLEND);
-      break;
-    }
-    currentBlendMode = bm;
   }
 }
 

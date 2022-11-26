@@ -3,6 +3,7 @@
 #include <string>
 #include <glm/gtc/matrix_transform.hpp>
 #include <map>
+#include <span>
 
 class Color;
 class Texture;
@@ -10,7 +11,7 @@ class Texture;
 class ShaderProgram
 {
 public:
-    ShaderProgram(const std::string &filename, const char *vss, const char *fss, const char *gss, const char *css, const char *ess, const char **invarsX, const char **varyingsX);
+    ShaderProgram(const std::string &filename, const char *vss, const char *fss, const char *gss, const char *css, const char *ess);
     ~ShaderProgram();
     void Set(const char *name, const glm::mat4 &mat);
     void Set(const char *name, const glm::vec2 &vec);

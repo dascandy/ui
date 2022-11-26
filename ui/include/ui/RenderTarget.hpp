@@ -11,10 +11,10 @@ public:
     Alphablend,
     Additive
   };
-  RenderTarget(Texture *d, Texture *t1, Texture *t2, Texture *t3, Texture *t4);
-  RenderTarget(Texture *d, Texture *t1, Texture *t2, Texture *t3);
-  RenderTarget(Texture *d, Texture *t1, Texture *t2);
-  RenderTarget(Texture *d, Texture *t1);
+  RenderTarget(bool depth, Texture *t1, Texture *t2, Texture *t3, Texture *t4);
+  RenderTarget(bool depth, Texture *t1, Texture *t2, Texture *t3);
+  RenderTarget(bool depth, Texture *t1, Texture *t2);
+  RenderTarget(bool depth, Texture *t1);
   RenderTarget(int width, int height, bool depth);
   void Clear();
   void ClearDepth();
@@ -30,7 +30,7 @@ private:
   int width, height;
   int vx, vy, vw, vh;
   unsigned int fbo;
-  Texture *d;
+  unsigned int rb;
   std::vector<Texture *> targets;
 };
 

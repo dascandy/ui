@@ -1,5 +1,6 @@
 #include <ui/ShaderProgram.hpp>
 #include <ui/Texture.hpp>
+#include <vector>
 #define MAX_TEXTURE_UNITS 8
 
 static inline void compileShader(const std::string &filename, int prog, int &shader, const char **source, int type)
@@ -21,7 +22,7 @@ static inline void compileShader(const std::string &filename, int prog, int &sha
   }
 }
 
-ShaderProgram::ShaderProgram(const std::string &filename, const char *vss, const char *fss, const char *gss, const char *css, const char *ess, const char **invarsX, const char **varyingsX)
+ShaderProgram::ShaderProgram(const std::string &filename, const char *vss, const char *fss, const char *gss, const char *css, const char *ess)
 : filename(filename)
 , curtex(0)
 , vs(0)
@@ -41,23 +42,6 @@ ShaderProgram::ShaderProgram(const std::string &filename, const char *vss, const
       compileShader(filename, prog, cs, &css, GL_TESS_CONTROL_SHADER);
     }
     compileShader(filename, prog, es, &ess, GL_TESS_EVALUATION_SHADER);
-  }
-
-  int invarcount = 0;
-  while (invarsX[invarcount]) invarcount++;
-  for (int i = 0; i < invarcount; i++)
-  {
-    glBindAttribLocation(prog, i, invarsX[i]);
-  }
-
-  if (varyingsX) 
-  {
-    int count = 0;
-    while (varyingsX[count])
-      count++;
-
-    if (count)
-      glTransformFeedbackVaryings(prog, count, varyingsX, GL_INTERLEAVED_ATTRIBS);
   }
 
   int ok = false;

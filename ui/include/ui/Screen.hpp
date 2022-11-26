@@ -10,21 +10,23 @@
 
 extern Val<int64_t> currentTimeMs; 
 
-class Window
+class Window;
+
+class Screen
 {
 public:
-  Window();
+  Screen();
   void Render();
-  ~Window();
+  ~Screen();
   bool quit = false;
   SDL_Window *window;
   SDL_GLContext context;
-  Val<uint32_t> width, height, x, y;
-  std::vector<Widget*> widgets;
-  ShaderProgram sp;
-  Texture image;
+  uint32_t width, height;
+  std::vector<Window*> windows;
+  std::unique_ptr<Texture> background;
+  VertexBuffer svb;
+  std::shared_ptr<ShaderProgram> screenShader;
   RenderTarget rt;
-  VertexBuffer vb;
 };
 
 

@@ -3,9 +3,32 @@
 #include <numeric>
 #include <string>
 
-void Flexbox::Render() {
+Flexbox::Flexbox(SubTexture st) 
+: texture(st)
+{
+
+}
+
+void Flexbox::Render(float parentX, float parentY, float parentZ, std::map<Texture*, std::vector<vertex>>& out) {
+  /*
+  float x1 = **x + parentX - **w / 2;
+  float y1 = **y + parentY - **h / 2;
+  float x2 = x1 + **w;
+  float y2 = y1 + **h;
+  float s1 = 0;
+  float t1 = 0;
+  float s2 = 1;
+  float t2 = 1;
+  std::vector<vertex>& v = out[texture.texture.get()];
+  v.push_back({x1, y1, parentZ, 0, 0, 1, s1, t1 });
+  v.push_back({x1, y2, parentZ, 0, 0, 1, s1, t2 });
+  v.push_back({x2, y1, parentZ, 0, 0, 1, s2, t1 });
+  v.push_back({x2, y1, parentZ, 0, 0, 1, s2, t1 });
+  v.push_back({x1, y2, parentZ, 0, 0, 1, s1, t2 });
+  v.push_back({x2, y2, parentZ, 0, 0, 1, s2, t2 });
+  */
   for (auto& widget : widgets) {
-    widget->Render();
+    widget->Render(parentX + **x, parentY + **y, parentZ + 0.0001, out);
   }
 }
 
@@ -44,26 +67,26 @@ void Flexbox::setAlign(Align newAlign) {
   }
 }
 
-void Flexbox::setMargin(double newMargin) {
+void Flexbox::setMargin(float newMargin) {
   if (margin != newMargin) {
     margin = newMargin;
     if (allowRelayout) Relayout();
   }
 }
 
-std::pair<double, double> getJustify(Flexbox::Justify justify, size_t margin, double spaceForMargin, size_t widgetCount) {
+static std::pair<float, float> getJustify(Flexbox::Justify justify, size_t margin, float spaceForMargin, size_t widgetCount) {
   if (spaceForMargin < 0) return { margin, margin };
 
   switch(justify) {
     case Flexbox::Justify::Start:
     default:
       return { margin, margin };
-    case Flexbox::Justify::End:
-      return { spaceForMargin + margin, margin };
     case Flexbox::Justify::Center:
-      return { spaceForMargin / 2 + margin, margin };
+      return { (spaceForMargin - (widgetCount-1) * margin) / 2, margin };
+    case Flexbox::Justify::End:
+      return { spaceForMargin - (widgetCount * margin), margin };
     case Flexbox::Justify::SpaceBetween:
-      return { margin, spaceForMargin / (widgetCount - 1) };
+      return { margin, (spaceForMargin - margin * 2) / (widgetCount - 1) };
     case Flexbox::Justify::SpaceAround:
       return { spaceForMargin / (widgetCount) / 2, spaceForMargin / (widgetCount) };
     case Flexbox::Justify::SpaceEvenly:
@@ -71,7 +94,7 @@ std::pair<double, double> getJustify(Flexbox::Justify justify, size_t margin, do
   }
 }
 
-static double getAlign(Flexbox::Align align, double boxWidth, double itemWidth) {
+static float getAlign(Flexbox::Align align, float boxWidth, float itemWidth) {
   switch(align) {
     case Flexbox::Align::Start:
     case Flexbox::Align::Stretch:
@@ -88,14 +111,14 @@ void Flexbox::Relayout() {
   if (widgets.empty()) return;
   bool horizontal = (direction == Flexbox::Direction::Row || direction == Flexbox::Direction::RowReverse);
   bool reverse = (direction == Flexbox::Direction::RowReverse || direction == Flexbox::Direction::ColumnReverse);
-  double available = (horizontal ? **w: **h);
+  float available = (horizontal ? **w: **h);
   std::span<std::unique_ptr<Widget>> ws = widgets;
   std::vector<std::span<std::unique_ptr<Widget>>> rows;
-  double curSize = margin;
+  float curSize = margin;
   
   size_t start = 0, index = 0;
-  double totalRowHeight = margin;
-  double rowMaxHeight = 0;
+  float totalRowHeight = margin;
+  float rowMaxHeight = 0;
   while (index < ws.size()) {
     if (wrap != Wrap::Line && curSize > margin && curSize + margin + (horizontal ? **(ws[index]->w) : **(ws[index]->h)) > available) {
       rows.push_back(ws.subspan(start, index-start));
@@ -105,7 +128,7 @@ void Flexbox::Relayout() {
       rowMaxHeight = 0;
     }
     curSize += margin + (horizontal ? **(ws[index]->w) : **(ws[index]->h));
-    rowMaxHeight = std::max<double>(rowMaxHeight, (horizontal ? **(ws[index]->h) : **(ws[index]->w)));
+    rowMaxHeight = std::max<float>(rowMaxHeight, (horizontal ? **(ws[index]->h) : **(ws[index]->w)));
     index++;
   }
   totalRowHeight += margin + rowMaxHeight;
@@ -114,19 +137,19 @@ void Flexbox::Relayout() {
     std::reverse(rows.begin(), rows.end());
   }
 
-  auto [topBefore, topBetween] = getJustify(vjustify, margin, (double)(horizontal ? **h : **w) - totalRowHeight, rows.size());
-  double top = topBefore;
+  auto [topBefore, topBetween] = getJustify(vjustify, margin, (float)(horizontal ? **h : **w) - totalRowHeight, rows.size());
+  float top = topBefore - (float)(horizontal ? **h : **w) / 2;
   for (auto row : rows) {
-    double totalMajor = std::accumulate(row.begin(), row.end(), margin, [&](size_t current, std::unique_ptr<Widget>& widget){ return current + margin + (horizontal ? **widget->w : **widget->h); });
-    double maxHeight = std::accumulate(row.begin(), row.end(), 0.0, [&](double current, std::unique_ptr<Widget>& widget) { return std::max<double>(current, horizontal ? **widget->h : **widget->w); });
-    auto [spaceBefore, spaceBetween] = getJustify(justify, margin, (double)(horizontal ? **w : **h) - totalMajor, row.size());
-    double start = reverse ? **w - spaceBefore : spaceBefore;
+    float totalMajor = std::accumulate(row.begin(), row.end(), margin, [&](size_t current, std::unique_ptr<Widget>& widget){ return current + margin + (horizontal ? **widget->w : **widget->h); });
+    float maxHeight = std::accumulate(row.begin(), row.end(), 0.0, [&](float current, std::unique_ptr<Widget>& widget) { return std::max<float>(current, horizontal ? **widget->h : **widget->w); });
+    auto [spaceBefore, spaceBetween] = getJustify(justify, margin, (float)(horizontal ? **w : **h) - totalMajor, row.size());
+    float start = (reverse ? (horizontal ? **w : **h) - spaceBefore : spaceBefore) - (horizontal ? **w : **h) / 2;
     for (auto& widget : row) {
       if (reverse) start -= (horizontal ? **widget->w : **widget->h);
       if (align == Align::Stretch) (horizontal ? widget->h : widget->w) = val(maxHeight);
-      double topOf = getAlign(align, maxHeight, (horizontal ? **widget->h : **widget->w));
-      widget->x = horizontal ? val(start) : val(top + topOf);
-      widget->y = horizontal ? val(top + topOf) : val(start);
+      float topOf = getAlign(align, maxHeight, (horizontal ? **widget->h : **widget->w));
+      widget->x = horizontal ? val(start + **widget->w / 2): val(top + topOf + **widget->w / 2);
+      widget->y = horizontal ? val(top + topOf + **widget->h / 2): val(start + **widget->h / 2);
       if (reverse)
         start -= spaceBetween;
       else
