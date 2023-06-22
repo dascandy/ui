@@ -9,7 +9,7 @@ VertexBuffer::VertexBuffer()
 {
 }
 
-void VertexBuffer::Construct(std::span<const VertexBuffer::reference> refs)
+void VertexBuffer::Construct(std::vector<VertexBuffer::reference> refs)
 {
   glGenVertexArrays(1, &vao);
   glBindVertexArray(vao);
@@ -65,9 +65,7 @@ VertexBuffer::~VertexBuffer()
 
 void VertexBuffer::Draw(size_t start, size_t rendercount)
 {
-  if (rendercount == 0) {
-    rendercount = count - start;
-  }
+  printf("%zu %zu\n", start, rendercount);
   glBindVertexArray(vao);
   glDrawArrays(GL_TRIANGLES, start, rendercount);
 }

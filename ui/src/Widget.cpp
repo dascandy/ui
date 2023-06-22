@@ -8,4 +8,18 @@ Widget::Widget()
 {
 }
 
+Widget::~Widget() {
+}
+
+void Widget::set(Width newWidth) {
+  w = val(newWidth.value);
+}
+
+void Widget::set(Height newHeight) {
+  h = val(newHeight.value);
+}
+
+void Widget::set(Stretch) {
+  stretch_ = true;
+}
 

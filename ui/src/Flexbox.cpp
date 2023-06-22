@@ -2,14 +2,20 @@
 #include <span>
 #include <numeric>
 #include <string>
+#include <ui/Theme.hpp>
+#include <SDL2/SDL.h>
 
-Flexbox::Flexbox(SubTexture st) 
-: texture(st)
+Flexbox::Flexbox()
 {
+}
 
+bool Flexbox::stretch() {
+  return false;
 }
 
 void Flexbox::Render(float parentX, float parentY, float parentZ, std::map<Texture*, std::vector<vertex>>& out) {
+//  Theme::Instance().CreateWhiteBox(out, parentZ, **x, **y, **w, **h);
+  
   /*
   float x1 = **x + parentX - **w / 2;
   float y1 = **y + parentY - **h / 2;
@@ -28,25 +34,25 @@ void Flexbox::Render(float parentX, float parentY, float parentZ, std::map<Textu
   v.push_back({x2, y2, parentZ, 0, 0, 1, s2, t2 });
   */
   for (auto& widget : widgets) {
-    widget->Render(parentX + **x, parentY + **y, parentZ + 0.0001, out);
+    widget->Render(parentX + **x, parentY + **y, parentZ - 0.0001, out);
   }
 }
 
-void Flexbox::setDirection(Direction newDirection) {
+void Flexbox::set(Direction newDirection) {
   if (direction != newDirection) {
     direction = newDirection;
     if (allowRelayout) Relayout();
   }
 }
 
-void Flexbox::setWrap(Wrap newWrap) {
+void Flexbox::set(Wrap newWrap) {
   if (wrap != newWrap) {
     wrap = newWrap;
     if (allowRelayout) Relayout();
   }
 }
 
-void Flexbox::setJustify(Justify newJustify) {
+void Flexbox::set(Justify newJustify) {
   if (justify != newJustify) {
     justify = newJustify;
     if (allowRelayout) Relayout();
@@ -60,96 +66,171 @@ void Flexbox::setVerticalJustify(Justify newJustify) {
   }
 }
 
-void Flexbox::setAlign(Align newAlign) {
+void Flexbox::set(Align newAlign) {
   if (align != newAlign) {
     align = newAlign;
     if (allowRelayout) Relayout();
   }
 }
 
-void Flexbox::setMargin(float newMargin) {
-  if (margin != newMargin) {
-    margin = newMargin;
+void Flexbox::set(Margin newMargin) {
+  if (margin != newMargin.value) {
+    margin = newMargin.value;
     if (allowRelayout) Relayout();
   }
 }
 
-static std::pair<float, float> getJustify(Flexbox::Justify justify, size_t margin, float spaceForMargin, size_t widgetCount) {
+static std::pair<float, float> getJustify(Justify justify, float margin, float outmargin, float spaceForMargin, size_t widgetCount) {
   if (spaceForMargin < 0) return { margin, margin };
 
   switch(justify) {
-    case Flexbox::Justify::Start:
+    case Justify::Start:
     default:
-      return { margin, margin };
-    case Flexbox::Justify::Center:
-      return { (spaceForMargin - (widgetCount-1) * margin) / 2, margin };
-    case Flexbox::Justify::End:
-      return { spaceForMargin - (widgetCount * margin), margin };
-    case Flexbox::Justify::SpaceBetween:
-      return { margin, (spaceForMargin - margin * 2) / (widgetCount - 1) };
-    case Flexbox::Justify::SpaceAround:
-      return { spaceForMargin / (widgetCount) / 2, spaceForMargin / (widgetCount) };
-    case Flexbox::Justify::SpaceEvenly:
-      return { spaceForMargin / (widgetCount + 1), spaceForMargin / (widgetCount + 1) };
+      return { outmargin, margin };
+    case Justify::Center:
+      return { outmargin + (spaceForMargin - (widgetCount - 1) * margin) / 2, margin };
+    case Justify::End:
+      return { outmargin + spaceForMargin - (widgetCount - 1) * margin, margin };
+    case Justify::SpaceBetween:
+      return { outmargin, (spaceForMargin) / (widgetCount - 1) };
+    case Justify::SpaceAround:
+      return { outmargin + spaceForMargin / (widgetCount) / 2, spaceForMargin / (widgetCount) };
+    case Justify::SpaceEvenly:
+      return { outmargin + spaceForMargin / (widgetCount + 1), spaceForMargin / (widgetCount + 1) };
   }
 }
 
-static float getAlign(Flexbox::Align align, float boxWidth, float itemWidth) {
+static float getAlign(Align align, float boxWidth, float itemWidth) {
   switch(align) {
-    case Flexbox::Align::Start:
-    case Flexbox::Align::Stretch:
+    case Align::Start:
+    case Align::Stretch:
     default:
       return 0;
-    case Flexbox::Align::End:
+    case Align::End:
       return boxWidth - itemWidth;
-    case Flexbox::Align::Center:
+    case Align::Center:
       return (boxWidth - itemWidth) / 2.0;
   }
 }
 
+int Flexbox::stretchcount() {
+  size_t count = 0;
+  for (auto& e : widgets) {
+    if (e->stretch()) {
+      count++;
+    }
+  }
+  return count;
+}
+
 void Flexbox::Relayout() {
-  if (widgets.empty()) return;
-  bool horizontal = (direction == Flexbox::Direction::Row || direction == Flexbox::Direction::RowReverse);
-  bool reverse = (direction == Flexbox::Direction::RowReverse || direction == Flexbox::Direction::ColumnReverse);
+  if (widgets.empty()) 
+    return;
+
+  // 1. Find the biggest and total size in each direction (ignoring the main direction of stretch elements)
+  float maxWidth = 0, maxHeight = 0, totalWidth = 0, totalHeight = 0;
+  for (auto& e : widgets) {
+    if (e->stretch()) {
+      if (direction == Direction::Row ||
+        direction == Direction::RowReverse) {
+        if (**e->h > maxHeight) maxHeight = **e->h;
+      } else {
+        if (**e->w > maxWidth) maxWidth = **e->w;
+      }
+    } else {
+      totalWidth += **e->w;
+      totalHeight += **e->h;
+      if (**e->w > maxWidth) maxWidth = **e->w;
+      if (**e->h > maxHeight) maxHeight = **e->h;
+    }
+  }
+  totalWidth += (widgets.size() - 1) * margin;
+  totalHeight += (widgets.size() - 1) * margin;
+
+  // 2. When align is set to stretch, stretch each element in that direction to the width of the container
+  if (align == Align::Stretch) {
+    for (auto& e : widgets) {
+      if (direction == Direction::Row || 
+          direction == Direction::RowReverse) {
+        e->h = h;
+      } else {
+        e->w = w;
+      }
+    }
+  } else {
+    if (direction == Direction::Row || 
+        direction == Direction::RowReverse) {
+      h = val(maxHeight);
+    } else {
+      w = val(maxWidth);
+    }
+  }
+
+  // 3. If we have a stretch element, then stretch up 
+  if (stretchcount()) {
+    if (direction == Direction::Row || 
+        direction == Direction::RowReverse) {
+      float newWidth = (**w - totalWidth) / stretchcount();
+      for (auto& e : widgets) {
+        if (e->stretch()) {
+          e->w = val(newWidth);
+        }
+      }
+    } else {
+      float newHeight = (**h - totalHeight) / stretchcount();
+      for (auto& e : widgets) {
+        if (e->stretch()) {
+          e->h = val(newHeight);
+        }
+      }
+    }
+  }
+
+  for (auto& w : widgets) w->Relayout();
+
+  bool horizontal = (direction == Direction::Row || direction == Direction::RowReverse);
+  bool reverse = (direction == Direction::RowReverse || direction == Direction::ColumnReverse);
   float available = (horizontal ? **w: **h);
-  std::span<std::unique_ptr<Widget>> ws = widgets;
-  std::vector<std::span<std::unique_ptr<Widget>>> rows;
-  float curSize = margin;
+  std::vector<Widget*> ws;
+  for (auto& w : widgets) ws.push_back(w.get());
+  std::vector<std::span<Widget*>> rows;
+  float curSize = outmargin;
   
   size_t start = 0, index = 0;
-  float totalRowHeight = margin;
+  float totalRowHeight = 2 * outmargin;
   float rowMaxHeight = 0;
   while (index < ws.size()) {
-    if (wrap != Wrap::Line && curSize > margin && curSize + margin + (horizontal ? **(ws[index]->w) : **(ws[index]->h)) > available) {
-      rows.push_back(ws.subspan(start, index-start));
-      totalRowHeight += margin + rowMaxHeight;
+    if (wrap != Wrap::Line && curSize > outmargin && curSize + 2 * outmargin + (horizontal ? **(ws[index]->w) : **(ws[index]->h)) > available) {
+      rows.push_back(std::span<Widget*>(ws.data() + start, ws.data() + index));
+      totalRowHeight += rowMaxHeight;
       start = index;
-      curSize = margin;
+      curSize = outmargin;
       rowMaxHeight = 0;
     }
     curSize += margin + (horizontal ? **(ws[index]->w) : **(ws[index]->h));
     rowMaxHeight = std::max<float>(rowMaxHeight, (horizontal ? **(ws[index]->h) : **(ws[index]->w)));
     index++;
   }
-  totalRowHeight += margin + rowMaxHeight;
-  rows.push_back(ws.subspan(start));
+  totalRowHeight += rowMaxHeight;
+  rows.push_back(std::span<Widget*>(ws.data() + start, ws.data() + index));
   if (wrap == Wrap::WrapReverse) {
     std::reverse(rows.begin(), rows.end());
   }
 
-  auto [topBefore, topBetween] = getJustify(vjustify, margin, (float)(horizontal ? **h : **w) - totalRowHeight, rows.size());
+  auto [topBefore, topBetween] = getJustify(vjustify, margin, outmargin, (float)(horizontal ? **h : **w) - totalRowHeight, rows.size());
   float top = topBefore - (float)(horizontal ? **h : **w) / 2;
   for (auto row : rows) {
-    float totalMajor = std::accumulate(row.begin(), row.end(), margin, [&](size_t current, std::unique_ptr<Widget>& widget){ return current + margin + (horizontal ? **widget->w : **widget->h); });
-    float maxHeight = std::accumulate(row.begin(), row.end(), 0.0, [&](float current, std::unique_ptr<Widget>& widget) { return std::max<float>(current, horizontal ? **widget->h : **widget->w); });
-    auto [spaceBefore, spaceBetween] = getJustify(justify, margin, (float)(horizontal ? **w : **h) - totalMajor, row.size());
+    float totalMajor = std::accumulate(row.begin(), row.end(), 2 * outmargin, [&](float current, Widget* widget){ return current + (horizontal ? **widget->w : **widget->h); });
+    float maxHeight = std::accumulate(row.begin(), row.end(), 0.0, [&](float current, Widget* widget) { return std::max<float>(current, horizontal ? **widget->h : **widget->w); });
+    auto [spaceBefore, spaceBetween] = getJustify(justify, margin, outmargin, (float)(horizontal ? **w : **h) - totalMajor, row.size());
     float start = (reverse ? (horizontal ? **w : **h) - spaceBefore : spaceBefore) - (horizontal ? **w : **h) / 2;
     for (auto& widget : row) {
       if (reverse) start -= (horizontal ? **widget->w : **widget->h);
-      if (align == Align::Stretch) (horizontal ? widget->h : widget->w) = val(maxHeight);
       float topOf = getAlign(align, maxHeight, (horizontal ? **widget->h : **widget->w));
-      widget->x = horizontal ? val(start + **widget->w / 2): val(top + topOf + **widget->w / 2);
-      widget->y = horizontal ? val(top + topOf + **widget->h / 2): val(start + **widget->h / 2);
+      Val<float> main = val(start + (horizontal ? **widget->w : **widget->h) / 2);
+      Val<float> off = val(top + topOf + (horizontal ? **widget->h : **widget->w) / 2);
+      widget->x = horizontal ? std::move(main) : std::move(off);
+      widget->y = horizontal ? std::move(off) : std::move(main);
       if (reverse)
         start -= spaceBetween;
       else
@@ -172,41 +253,59 @@ void Flexbox::removeWidget(size_t offset) {
   if (allowRelayout) Relayout();
 }
 
-std::string to_string(Flexbox::Direction direction) {
+std::string to_string(Direction direction) {
   switch(direction) {
-    case Flexbox::Direction::Column: return "Column";
-    case Flexbox::Direction::ColumnReverse: return "ColumnReverse";
-    case Flexbox::Direction::Row: return "Row";
-    case Flexbox::Direction::RowReverse: return "RowReverse";
+    case Direction::Column: return "Column";
+    case Direction::ColumnReverse: return "ColumnReverse";
+    case Direction::Row: return "Row";
+    case Direction::RowReverse: return "RowReverse";
   }
 }
 
-std::string to_string(Flexbox::Wrap wrap) {
+std::string to_string(Wrap wrap) {
   switch(wrap) {
-    case Flexbox::Wrap::Wrap: return "Wrap";
-    case Flexbox::Wrap::Line: return "Line";
-    case Flexbox::Wrap::WrapReverse: return "WrapReverse";
+    case Wrap::Wrap: return "Wrap";
+    case Wrap::Line: return "Line";
+    case Wrap::WrapReverse: return "WrapReverse";
   }
 }
 
-std::string to_string(Flexbox::Justify justify) {
+std::string to_string(Justify justify) {
   switch (justify) {
-    case Flexbox::Justify::Center: return "Center";
-    case Flexbox::Justify::Start: return "Start";
-    case Flexbox::Justify::End: return "End";
-    case Flexbox::Justify::SpaceAround: return "SpaceAround";
-    case Flexbox::Justify::SpaceBetween: return "SpaceBetween";
-    case Flexbox::Justify::SpaceEvenly: return "SpaceEvenly";
+    case Justify::Center: return "Center";
+    case Justify::Start: return "Start";
+    case Justify::End: return "End";
+    case Justify::SpaceAround: return "SpaceAround";
+    case Justify::SpaceBetween: return "SpaceBetween";
+    case Justify::SpaceEvenly: return "SpaceEvenly";
   }
 }
 
-std::string to_string(Flexbox::Align align) {
+std::string to_string(Align align) {
   switch(align) {
-    case Flexbox::Align::Center: return "Center";
-    case Flexbox::Align::Start: return "Start";
-    case Flexbox::Align::End: return "End";
-    case Flexbox::Align::Stretch: return "Stretch";
+    case Align::Center: return "Center";
+    case Align::Start: return "Start";
+    case Align::End: return "End";
+    case Align::Stretch: return "Stretch";
   }
+}
+
+bool Flexbox::HandleEvent(const SDL_Event& event) {
+  if (event.type == SDL_KEYDOWN ||
+      event.type == SDL_KEYUP) {
+    if (currentFocus) 
+      return currentFocus->HandleEvent(event);
+    return false;
+  } else {
+    for (auto& widget : widgets) {
+      if (x) {
+        bool wasHandled = widget->HandleEvent(event);
+        currentFocus = widget.get();
+        return wasHandled;
+      }
+    }
+  }
+  return false;
 }
 
 /*
@@ -216,14 +315,6 @@ std::string to_string(Flexbox::Align align) {
 - Disappear -> (in flexbox) shrink in direction of flexbox resize
 - Appear -> (in flexbox) grow in direction of flexbox resize
 - Slide over -> -0.5 cosine movement to target position
-
-Window:
-- Snap to -> cosine movement starting at 4 corners
-- Minimize -> fold closed (from both sides) into shrinking icon
-- Maximize -> fold open (from both sides) from icon to window
-- Close -> shrink from 100% opaque to 70% 30% opaque, then disappear
-- Open -> spawn at 70% size 30% opacity, grow to 100% opaque
-- Crash -> Shatter like window
 */
 
 

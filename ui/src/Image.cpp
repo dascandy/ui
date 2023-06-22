@@ -17,12 +17,12 @@ void Image::Render(float parentX, float parentY, float parentZ, std::map<Texture
   float s2 = s1 + texture.w;
   float t2 = t1 + texture.h;
   std::vector<vertex>& v = out[texture.texture.get()];
-  v.push_back({x1, y1, parentZ, 0, 0, 1, s1, t1 });
-  v.push_back({x1, y2, parentZ, 0, 0, 1, s1, t2 });
-  v.push_back({x2, y1, parentZ, 0, 0, 1, s2, t1 });
-  v.push_back({x2, y1, parentZ, 0, 0, 1, s2, t1 });
-  v.push_back({x1, y2, parentZ, 0, 0, 1, s1, t2 });
-  v.push_back({x2, y2, parentZ, 0, 0, 1, s2, t2 });
+  v.push_back({x1, y1, parentZ, s1, t1, 1, 1, 1 });
+  v.push_back({x1, y2, parentZ, s1, t2, 1, 1, 1 });
+  v.push_back({x2, y1, parentZ, s2, t1, 1, 1, 1 });
+  v.push_back({x2, y1, parentZ, s2, t1, 1, 1, 1 });
+  v.push_back({x1, y2, parentZ, s1, t2, 1, 1, 1 });
+  v.push_back({x2, y2, parentZ, s2, t2, 1, 1, 1 });
 }
 
 

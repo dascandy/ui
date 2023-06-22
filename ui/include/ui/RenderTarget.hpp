@@ -20,6 +20,7 @@ public:
   void ClearDepth();
   void Activate(BlendMode bm = Overwrite);
   void AddTarget(Texture *target);
+  void Resize(size_t newWidth, size_t newHeight);
   ~RenderTarget();
 private:
   RenderTarget(const RenderTarget&) = delete;
@@ -28,7 +29,6 @@ private:
   const RenderTarget& operator=(RenderTarget&&) = delete;
   bool depth;
   int width, height;
-  int vx, vy, vw, vh;
   unsigned int fbo;
   unsigned int rb;
   std::vector<Texture *> targets;

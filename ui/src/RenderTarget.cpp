@@ -1,8 +1,6 @@
 #include <ui/RenderTarget.hpp>
 #include <cstdio>
 
-static int cvx = 0, cvy = 0, cvw = 0, cvh = 0;
-
 static const unsigned int buffers[] = 
 {
   GL_COLOR_ATTACHMENT0,
@@ -45,10 +43,6 @@ RenderTarget::RenderTarget(bool depth, Texture *t1)
 : depth(depth)
 , width(t1->width())
 , height(t1->height())
-, vx(0)
-, vy(0)
-, vw(width)
-, vh(height)
 , fbo(0)
 {
   glGenFramebuffers(1, &fbo);
@@ -68,10 +62,6 @@ RenderTarget::RenderTarget(int width, int height, bool depth)
 : depth(depth)
 , width(width)
 , height(height)
-, vx(0)
-, vy(0)
-, vw(width)
-, vh(height)
 , fbo(0)
 {
 }
@@ -87,6 +77,11 @@ RenderTarget::~RenderTarget()
     glDeleteFramebuffers(1, &fbo);
 }
 
+void RenderTarget::Resize(size_t newWidth, size_t newHeight) {
+  width = newWidth;
+  height = newHeight;
+}
+
 void RenderTarget::Activate(BlendMode bm)
 {
   glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -98,15 +93,6 @@ void RenderTarget::Activate(BlendMode bm)
       glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, targets[i]->gl_id(), 0);
     }
     glDrawBuffers(targets.size(), buffers);
-  }
-
-  if (cvx != vx || cvy != vy || cvw != vw || cvh != vh)
-  {
-    cvx = vx;
-    cvy = vy;
-    cvw = vw;
-    cvh = vh;
-    glViewport(vx, vy, vw, vh);
   }
 
   if (depth)
@@ -154,28 +140,12 @@ void RenderTarget::Activate(BlendMode bm)
 void RenderTarget::Clear()
 {
   Activate();
-  if (cvx != vx || cvy != vy || cvw != vw || cvh != vh)
-  {
-    cvx = vx;
-    cvy = vy;
-    cvw = vw;
-    cvh = vh;
-    glViewport(vx, vy, vw, vh);
-  }
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void RenderTarget::ClearDepth()
 {
   Activate();
-  if (cvx != vx || cvy != vy || cvw != vw || cvh != vh)
-  {
-    cvx = vx;
-    cvy = vy;
-    cvw = vw;
-    cvh = vh;
-    glViewport(vx, vy, vw, vh);
-  }
   glClear(GL_DEPTH_BUFFER_BIT);
 }
 

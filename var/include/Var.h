@@ -67,10 +67,11 @@ public:
 template <typename T>
 class VarSwitch : public Var<T> {
 public:
-  const Val<size_t>& time;
-  size_t switchTime;
-  Val<T> before, after;
-  VarSwitch(const Val<size_t>& time, size_t switchTime, Val<T> before, Val<T> after) 
+  const Val<int64_t>& time;
+  int64_t switchTime;
+  mutable Val<T> before;
+  Val<T> after;
+  VarSwitch(const Val<int64_t>& time, int64_t switchTime, Val<T> before, Val<T> after) 
   : time(time)
   , switchTime(switchTime)
   , before(before)
@@ -82,13 +83,13 @@ public:
       return **before;
     } else {
       before.reset();
-      return after;
+      return **after;
     }
   }
 };
 
 template <typename T>
-Val<T> varswitch(const Val<size_t>& time, size_t switchTime, Val<T> before, Val<T> after) {
+Val<T> varswitch(const Val<int64_t>& time, int64_t switchTime, Val<T> before, Val<T> after) {
   return std::make_shared<VarSwitch<T>>(time, switchTime, std::move(before), std::move(after));
 }
 
